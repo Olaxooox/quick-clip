@@ -1422,6 +1422,28 @@ module.exports = QRCode;
             ></textarea>
           </div>
 
+          <!-- Image Sync -->
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+              <button onclick="document.getElementById('imageInput').click()" class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2.5 px-4 sm:text-sm">🖼️ Send Image</button>
+              <input id="imageInput" type="file" accept="image/*" class="hidden" />
+              <span class="text-[11px] text-slate-400 dark:text-neutral-500">or paste / drop an image anywhere on the page</span>
+            </div>
+
+            <div id="imageCard" class="hidden flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl animate-fade-in">
+              <img id="imagePreview" alt="Shared image" class="max-h-64 w-full object-contain rounded-lg" />
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <span id="imageMeta" class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 truncate"></span>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button onclick="copyImage()" class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2 px-3">📋 Copy Image</button>
+                  <button onclick="saveImage()" class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2 px-3">💾 Save</button>
+                  <button id="shareImageBtn" onclick="shareImage()" class="hidden bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2 px-3">📤 Share</button>
+                  <button onclick="clearImage()" class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2 px-3" title="Remove image from this screen">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Action Controls -->
           <div class="grid grid-cols-3 gap-3 pt-2">
             <button
@@ -1530,6 +1552,8 @@ module.exports = QRCode;
     const textarea = document.getElementById('clipText');
 
     // 2. PeerJS Setup (P2P Connection)
+    // If PeerJS fails to load or start, the rest of the page (text, images) must still work.
+    try {
     if (!peerId) {
       // DESKTOP MODE (Host)
       peerId = 'qc-' + Math.random().toString(36).substring(2, 9);
@@ -1580,6 +1604,10 @@ module.exports = QRCode;
         setupConnectionListeners(conn);
       });
     }
+    } catch (err) {
+      console.error('Could not start PeerJS:', err);
+      showToast("Could not start the connection. Check your internet and reload.");
+    }
 
     // FIX: handle the case where the connection is already open when the
     // listener is attached (the "open" event would never fire on the host).
@@ -1601,15 +1629,7 @@ module.exports = QRCode;
       if (conn.open) handleOpen();   // already open
       conn.on('open', handleOpen);   // or wait for it
 
-      conn.on('data', (data) => {
-        if (data.type === 'DEVICE_INFO') {
-          onDeviceConnected(data.device);
-        } else if (data.type === 'TEXT_SYNC') {
-          textarea.value = data.text;
-          updateCounters();
-          showToast("Received new text!");
-        }
-      });
+      conn.on('data', handleIncomingData);
 
       conn.on('close', () => {
         showToast("Connection closed.");
@@ -1690,6 +1710,181 @@ module.exports = QRCode;
       const words = text.trim() ? text.trim().split(/\s+/).length : 0;
       document.getElementById('wordCount').innerText = `${words} words`;
     }
+
+    // Everything the other device sends arrives here
+    function handleIncomingData(data) {
+      if (!data) return;
+      if (data.type === 'DEVICE_INFO') {
+        onDeviceConnected(data.device);
+      } else if (data.type === 'TEXT_SYNC') {
+        textarea.value = data.text;
+        updateCounters();
+        showToast("Received new text!");
+      } else if (data.type === 'IMAGE_SYNC') {
+        const blob = new Blob([data.data], { type: data.mime || 'image/png' });
+        showImage(blob, data.name);
+        showToast("Received an image!");
+      }
+    }
+
+    // 4. Image sharing: send, receive, copy, save
+    const MAX_SEND_BYTES = 4 * 1024 * 1024;     // bigger images are shrunk to JPEG first
+    const HARD_LIMIT_BYTES = 12 * 1024 * 1024;  // never send more than this
+    let currentImage = null;                    // { blob, name, url }
+
+    function formatBytes(n) {
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+      return (n / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    function ensureExt(name, mime) {
+      const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[mime] || 'png';
+      const base = name || 'quickclip-image';
+      return /\.\w{2,5}$/.test(base) ? base : base + '.' + ext;
+    }
+
+    async function reencode(blob, type, quality, maxSide) {
+      const bitmap = await createImageBitmap(blob);
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not encode image')), type, quality);
+      });
+    }
+
+    async function prepareImage(file) {
+      if (file.size <= MAX_SEND_BYTES) return file;
+      const jpeg = await reencode(file, 'image/jpeg', 0.85, 2560);
+      const base = (file.name || 'image').replace(/\.\w+$/, '');
+      return new File([jpeg], base + '.jpg', { type: 'image/jpeg' });
+    }
+
+    function showImage(blob, name) {
+      if (currentImage) URL.revokeObjectURL(currentImage.url);
+      const url = URL.createObjectURL(blob);
+      currentImage = { blob, name: ensureExt(name, blob.type), url };
+      document.getElementById('imagePreview').src = url;
+      setText('imageMeta', `${currentImage.name} • ${formatBytes(blob.size)}`);
+      const card = document.getElementById('imageCard');
+      card.classList.remove('hidden');
+      card.classList.add('flex');
+    }
+
+    function clearImage() {
+      if (currentImage) URL.revokeObjectURL(currentImage.url);
+      currentImage = null;
+      document.getElementById('imagePreview').removeAttribute('src');
+      const card = document.getElementById('imageCard');
+      card.classList.add('hidden');
+      card.classList.remove('flex');
+    }
+
+    async function sendImage(blob) {
+      if (!(activeConn && activeConn.open)) {
+        showToast("Not connected to phone yet.");
+        return;
+      }
+      const buffer = await blob.arrayBuffer();
+      activeConn.send({ type: 'IMAGE_SYNC', name: currentImage ? currentImage.name : 'image', mime: blob.type, data: buffer });
+      showToast("Image sent!");
+    }
+
+    async function handleImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast("That is not an image.");
+        return;
+      }
+      try {
+        const prepared = await prepareImage(file);
+        if (prepared.size > HARD_LIMIT_BYTES) {
+          showToast("Image is too large to send.");
+          return;
+        }
+        showImage(prepared, prepared.name || file.name);
+        await sendImage(prepared);
+      } catch (err) {
+        console.error('Image error:', err);
+        showToast("Could not read that image.");
+      }
+    }
+
+    async function copyImage() {
+      if (!currentImage) return;
+      try {
+        const blob = currentImage.blob;
+        // Clipboards only accept PNG for images, so convert other formats.
+        const pngPromise = blob.type === 'image/png'
+          ? Promise.resolve(blob)
+          : reencode(blob, 'image/png', 1, 100000);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngPromise })]);
+        showToast("Image copied!");
+      } catch (err) {
+        console.error('Copy image failed:', err);
+        showToast("Can't copy images here. Use Save instead.");
+      }
+    }
+
+    function saveImage() {
+      if (!currentImage) return;
+      const a = document.createElement('a');
+      a.href = currentImage.url;
+      a.download = currentImage.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("Saving image...");
+    }
+
+    async function shareImage() {
+      if (!currentImage) return;
+      const file = new File([currentImage.blob], currentImage.name, { type: currentImage.blob.type });
+      try {
+        await navigator.share({ files: [file] });
+      } catch (err) {
+        if (err && err.name !== 'AbortError') showToast("Sharing is not available here.");
+      }
+    }
+
+    // Pick a file
+    document.getElementById('imageInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      handleImageFile(file);
+    });
+
+    // Paste an image (Ctrl+V / long-press paste); normal text pastes are left alone
+    document.addEventListener('paste', (e) => {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          e.preventDefault();
+          handleImageFile(item.getAsFile());
+          return;
+        }
+      }
+    });
+
+    // Drag and drop an image anywhere on the page
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer && e.dataTransfer.files[0];
+      if (file) handleImageFile(file);
+    });
+
+    // Show the Share button only where the browser can share files (most phones)
+    try {
+      const probe = new File(['x'], 'probe.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [probe] })) {
+        document.getElementById('shareImageBtn').classList.remove('hidden');
+      }
+    } catch (e) { /* not supported */ }
 
     // Copy & Clear
     async function copyToClipboard() {

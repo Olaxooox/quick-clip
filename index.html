@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuickClip - Phone to Desktop Sync</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Firebase App & Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
+
+  <!-- Header -->
+  <header class="p-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur">
+    <div class="max-w-xl mx-auto flex justify-between items-center">
+      <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+        ⚡ QuickClip
+      </h1>
+      <span id="roomBadge" class="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full font-mono">
+        Room: ...
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-xl mx-auto w-full p-4 flex-1 flex flex-col gap-6">
+
+    <!-- QR Code / Connect Section -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 text-center flex flex-col items-center gap-3">
+      <p class="text-sm text-slate-400">Scan with your phone to sync with this desktop session:</p>
+      <div id="qrcode" class="p-2 bg-white rounded-xl shadow-lg"></div>
+      <p class="text-xs text-slate-500 break-all max-w-xs" id="roomUrl"></p>
+    </div>
+
+    <!-- Clipboard Input Area -->
+    <div class="flex flex-col gap-2">
+      <label for="clipText" class="text-sm font-medium text-slate-300 flex justify-between items-center">
+        <span>Shared Clipboard</span>
+        <span id="status" class="text-xs text-emerald-400 flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected
+        </span>
+      </label>
+
+      <textarea
+        id="clipText"
+        rows="6"
+        placeholder="Type or paste text here on phone or desktop..."
+        class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition"
+      ></textarea>
+
+      <!-- Action Buttons -->
+      <div class="grid grid-cols-2 gap-3 mt-2">
+        <button
+          onclick="copyToClipboard()"
+          class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition"
+        >
+          📋 Copy Text
+        </button>
+        <button
+          onclick="clearText()"
+          class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition"
+        >
+          🗑️ Clear Text
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-full shadow-2xl transition duration-300 opacity-0 pointer-events-none">
+    Copied to clipboard!
+  </div>
+
+  <footer class="text-center p-4 text-xs text-slate-600 border-t border-slate-800">
+    Open this link on both devices to transfer text instantly across devices.
+  </footer>
+
+  <script>
+    // 1. Room Setup
+    const urlParams = new URLSearchParams(window.location.search);
+    let roomId = urlParams.get('room');
+
+    if (!roomId) {
+      roomId = Math.random().toString(36).substring(2, 8);
+      window.history.replaceState({}, '', `?room=${roomId}`);
+    }
+
+    document.getElementById('roomBadge').innerText = `Room: ${roomId}`;
+    const fullUrl = window.location.href;
+    document.getElementById('roomUrl').innerText = fullUrl;
+
+    // 2. Generate QR Code
+    new QRCode(document.getElementById("qrcode"), {
+      text: fullUrl,
+      width: 128,
+      height: 128,
+      colorDark : "#0f172a",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.H
+    });
+
+    // 3. Public Firebase Demo Relay (No database registration required)
+    const firebaseConfig = {
+      databaseURL: "https://clip-sync-default-rtdb.firebaseio.com/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const roomRef = db.ref('rooms/' + roomId);
+
+    const textarea = document.getElementById('clipText');
+    let isLocalChange = false;
+
+    // Send changes to remote room
+    textarea.addEventListener('input', (e) => {
+      isLocalChange = true;
+      roomRef.set({ text: e.target.value });
+    });
+
+    // Listen for remote updates
+    roomRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data && !isLocalChange) {
+        textarea.value = data.text || '';
+      }
+      isLocalChange = false;
+    });
+
+    // 4. Utility Functions
+    async function copyToClipboard() {
+      const text = textarea.value;
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Copied to clipboard!");
+      } catch (err) {
+        textarea.select();
+        document.execCommand('copy');
+        showToast("Copied!");
+      }
+    }
+
+    function clearText() {
+      textarea.value = '';
+      roomRef.set({ text: '' });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

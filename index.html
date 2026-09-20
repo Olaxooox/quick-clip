@@ -13,11 +13,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in {
-      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
   </style>
 </head>
@@ -25,7 +25,7 @@
 
   <!-- Header -->
   <header class="px-6 py-4 border-b border-slate-200 dark:border-neutral-900 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300">
-    <div class="max-w-5xl mx-auto flex justify-between items-center">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
       <div class="flex items-center gap-2.5">
         <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
         <h1 class="text-base font-medium tracking-tight text-neutral-900 dark:text-neutral-200">
@@ -53,63 +53,63 @@
   </header>
 
   <!-- Main Content Layout -->
-  <main class="max-w-5xl mx-auto w-full p-6 sm:p-10 flex-1">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+  <main class="max-w-6xl mx-auto w-full p-6 sm:p-8 flex-1 flex flex-col">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1">
 
-      <!-- Left Sidebar: Connection & Device Info (4 cols) -->
-      <section class="lg:col-span-4 flex flex-col gap-6">
-        
-        <!-- Connection Status Card -->
+      <!-- Left Sidebar: Connection Status Card (4 cols) -->
+      <section class="lg:col-span-4 flex flex-col gap-5">
         <div class="bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800/60 rounded-2xl p-6 shadow-sm flex flex-col gap-5 transition-all hover:border-slate-300 dark:hover:border-neutral-700/60">
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-neutral-500">Status</span>
             <span id="statusBadge" class="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 transition-all">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 animate-pulse"></span> Waiting for phone...
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 animate-pulse"></span> Waiting for scan...
             </span>
           </div>
 
-          <!-- QR Code Container -->
-          <div id="qrCard" class="flex flex-col items-center gap-4 py-4 bg-slate-50 dark:bg-neutral-950/60 rounded-xl border border-slate-200 dark:border-neutral-800/80 p-5 transition-all duration-300">
-            <p class="text-xs text-slate-500 dark:text-neutral-400 text-center">Scan with phone camera to connect:</p>
-            <div id="qrcode" class="p-3 bg-white rounded-xl shadow-md border border-neutral-200 transition-transform hover:scale-105 duration-200"></div>
-            <p class="text-[11px] text-slate-400 dark:text-neutral-500 break-all text-center max-w-xs font-mono" id="roomUrl"></p>
-          </div>
-
-          <!-- Connected Device Box -->
-          <div id="connectedDeviceCard" class="hidden flex-col gap-3 p-4 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl animate-fade-in">
+          <!-- Connected Device Box (Shown after scanning) -->
+          <div id="connectedDeviceCard" class="hidden flex-col gap-4 p-5 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
             <div class="flex items-center justify-between">
               <span class="text-xs font-medium text-slate-500 dark:text-neutral-400">Paired Device</span>
-              <button onclick="toggleQrCode()" class="text-xs text-slate-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition underline underline-offset-2">
-                Toggle QR
+              <button onclick="showQrModal()" class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
+                Show QR Code
               </button>
             </div>
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <div class="flex items-center gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl text-emerald-600 dark:text-emerald-400">
                 📱
               </div>
               <div class="overflow-hidden">
-                <p id="deviceNameText" class="text-xs font-medium text-slate-800 dark:text-neutral-200 truncate">Mobile Device</p>
+                <p id="deviceNameText" class="text-sm font-semibold text-slate-800 dark:text-neutral-200 truncate">Mobile Device</p>
                 <p class="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span> Live Sync Active
                 </p>
               </div>
             </div>
           </div>
+
+          <!-- Manual Re-open QR Button if not connected -->
+          <button
+            id="reopenQrBtn"
+            onclick="showQrModal()"
+            class="w-full bg-slate-100 dark:bg-neutral-800/80 hover:bg-slate-200 dark:hover:bg-neutral-800 text-slate-700 dark:text-neutral-300 font-medium py-3 rounded-xl border border-slate-200 dark:border-neutral-700/60 transition text-xs flex items-center justify-center gap-2"
+          >
+            <span>📱</span> Show Pair QR Code
+          </button>
         </div>
 
         <!-- Instructions -->
         <div class="px-2 text-xs text-slate-500 dark:text-neutral-500 flex flex-col gap-1.5 leading-relaxed">
           <p class="font-medium text-slate-700 dark:text-neutral-400">Minimal Setup:</p>
-          <p>Scan on mobile, paste your text, and click Copy on your desktop. No registration required.</p>
+          <p>Scan the QR code with your smartphone. Any text you paste on your phone will stream directly to your desktop in real time.</p>
         </div>
       </section>
 
-      <!-- Right Column: Text Area & Controls (8 cols) -->
-      <section class="lg:col-span-8 flex flex-col gap-4">
-        <div class="bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800/60 rounded-2xl p-6 shadow-sm flex flex-col gap-4 flex-1 transition-all hover:border-slate-300 dark:hover:border-neutral-700/60">
+      <!-- Right Column: BIG Shared Clipboard Card (8 cols) -->
+      <section class="lg:col-span-8 flex flex-col h-full min-h-[480px]">
+        <div class="bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800/60 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col gap-4 flex-1 transition-all hover:border-slate-300 dark:hover:border-neutral-700/60">
           
           <div class="flex items-center justify-between flex-wrap gap-2">
-            <label for="clipText" class="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+            <label for="clipText" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
               Shared Clipboard
             </label>
             <div class="flex items-center gap-3 text-xs text-slate-400 dark:text-neutral-500 font-mono">
@@ -119,33 +119,32 @@
             </div>
           </div>
 
-          <!-- Main Textarea -->
-          <div class="relative flex-1">
+          <!-- Expanded Textarea -->
+          <div class="relative flex-1 flex flex-col">
             <textarea
               id="clipText"
-              rows="10"
-              placeholder="Paste text on phone to see it live here..."
-              class="w-full h-full min-h-[260px] sm:min-h-[300px] bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl p-4 text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 resize-none font-mono text-sm leading-relaxed transition-all duration-200"
+              placeholder="Waiting for text from phone... or type/paste here to send back!"
+              class="w-full flex-1 min-h-[350px] lg:min-h-[420px] bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 resize-none font-mono text-sm sm:text-base leading-relaxed transition-all duration-200"
             ></textarea>
           </div>
 
-          <!-- Action Buttons -->
+          <!-- Action Controls -->
           <div class="grid grid-cols-3 gap-3 pt-2">
             <button
               onclick="sendText()"
-              class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs sm:text-sm"
+              class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs sm:text-sm"
             >
               🚀 Send
             </button>
             <button
               onclick="copyToClipboard()"
-              class="bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm transition duration-150 text-xs sm:text-sm"
+              class="bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm transition duration-150 text-xs sm:text-sm"
             >
               📋 Copy
             </button>
             <button
               onclick="clearText()"
-              class="bg-white dark:bg-neutral-950 hover:bg-slate-100 dark:hover:bg-neutral-900 active:scale-95 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-800 transition duration-150 text-xs sm:text-sm"
+              class="bg-white dark:bg-neutral-950 hover:bg-slate-100 dark:hover:bg-neutral-900 active:scale-95 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-800 transition duration-150 text-xs sm:text-sm"
             >
               🗑️ Clear
             </button>
@@ -157,28 +156,31 @@
     </div>
   </main>
 
-  <!-- Device Joined Pop-up Modal -->
-  <div id="deviceModal" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300 opacity-0 pointer-events-none">
-    <div class="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-4 transform transition-all duration-300 scale-95">
-      <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl text-emerald-500 dark:text-emerald-400">
-        📱
-      </div>
+  <!-- Initial QR Code Modal (Blurs background until scanned) -->
+  <div id="qrModal" class="fixed inset-0 bg-neutral-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-500 opacity-100">
+    <div class="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-5 transform transition-all duration-300 scale-100">
       <div>
-        <h3 class="text-base font-semibold text-slate-800 dark:text-neutral-100">Device Connected</h3>
-        <p id="modalDeviceName" class="text-xs font-medium font-mono text-emerald-600 dark:text-emerald-400 mt-1">Mobile Browser</p>
-        <p class="text-xs text-slate-500 dark:text-neutral-400 mt-2 leading-relaxed">Your mobile device is synced with this desktop session. The QR code is now hidden.</p>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-neutral-100">Scan to Connect</h3>
+        <p class="text-xs text-slate-500 dark:text-neutral-400 mt-1">Open your phone camera to pair with this desktop room:</p>
       </div>
+
+      <div class="p-4 bg-white rounded-2xl shadow-inner border border-slate-200">
+        <div id="qrcode"></div>
+      </div>
+
+      <p class="text-[11px] text-slate-400 dark:text-neutral-500 break-all font-mono max-w-xs" id="roomUrl"></p>
+
       <button 
-        onclick="closeModal()" 
-        class="w-full bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-neutral-950 font-medium py-2 rounded-xl transition duration-150 shadow-sm text-xs"
+        onclick="closeQrModal()" 
+        class="w-full bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 font-medium py-2.5 rounded-xl transition text-xs"
       >
-        Dismiss
+        Dismiss for now
       </button>
     </div>
   </div>
 
   <!-- Toast Notification -->
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-medium px-4 py-2 rounded-full shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-medium px-5 py-2.5 rounded-full shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
     <span>Copied to clipboard!</span>
   </div>
 
@@ -202,13 +204,8 @@
 
     function toggleDarkMode() {
       const isDark = document.documentElement.classList.toggle('dark');
-      if (isDark) {
-        localStorage.setItem('theme', 'dark');
-        document.getElementById('themeIcon').innerText = '🌙';
-      } else {
-        localStorage.setItem('theme', 'light');
-        document.getElementById('themeIcon').innerText = '☀️';
-      }
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      document.getElementById('themeIcon').innerText = isDark ? '🌙' : '☀️';
     }
 
     initTheme();
@@ -237,17 +234,32 @@
 
     const currentDevice = getDeviceInfo();
 
-    // 2. Minimalist QR Code
+    // 2. Generate QR Code
     new QRCode(document.getElementById("qrcode"), {
       text: fullUrl,
-      width: 120,
-      height: 120,
+      width: 140,
+      height: 140,
       colorDark : "#0a0a0a",
       colorLight : "#ffffff",
       correctLevel : QRCode.CorrectLevel.H
     });
 
     const textarea = document.getElementById('clipText');
+
+    // Modal controls
+    function showQrModal() {
+      const modal = document.getElementById('qrModal');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.firstElementChild.classList.remove('scale-95');
+      modal.firstElementChild.classList.add('scale-100');
+    }
+
+    function closeQrModal() {
+      const modal = document.getElementById('qrModal');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      modal.firstElementChild.classList.remove('scale-100');
+      modal.firstElementChild.classList.add('scale-95');
+    }
 
     // 3. Connect to Real-Time Relay
     const eventSource = new EventSource(`https://ntfy.sh/${roomId}/sse`);
@@ -285,37 +297,23 @@
       }
     };
 
+    // Triggered when phone joins: Closes QR modal & updates status with animation
     function onDeviceConnected(deviceName) {
-      const statusBadge = document.getElementById('statusBadge');
-      statusBadge.className = "text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 transition-all";
-      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span> Connected`;
+      closeQrModal();
 
-      document.getElementById('qrCard').classList.add('hidden');
-      document.getElementById('connectedDeviceCard').classList.remove('hidden');
-      document.getElementById('connectedDeviceCard').classList.add('flex');
-      document.getElementById('deviceNameText').innerText = deviceName;
+      setTimeout(() => {
+        const statusBadge = document.getElementById('statusBadge');
+        statusBadge.className = "text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 transition-all";
+        statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span> Connected`;
 
-      document.getElementById('modalDeviceName').innerText = deviceName;
-      showModal();
-    }
+        document.getElementById('reopenQrBtn').classList.add('hidden');
+        const connectedCard = document.getElementById('connectedDeviceCard');
+        connectedCard.classList.remove('hidden');
+        connectedCard.classList.add('flex', 'animate-fade-in');
+        document.getElementById('deviceNameText').innerText = deviceName;
 
-    function toggleQrCode() {
-      const qrCard = document.getElementById('qrCard');
-      qrCard.classList.toggle('hidden');
-    }
-
-    function showModal() {
-      const modal = document.getElementById('deviceModal');
-      modal.classList.remove('opacity-0', 'pointer-events-none');
-      modal.firstElementChild.classList.remove('scale-95');
-      modal.firstElementChild.classList.add('scale-100');
-    }
-
-    function closeModal() {
-      const modal = document.getElementById('deviceModal');
-      modal.classList.add('opacity-0', 'pointer-events-none');
-      modal.firstElementChild.classList.remove('scale-100');
-      modal.firstElementChild.classList.add('scale-95');
+        showToast(`${deviceName} connected!`);
+      }, 300);
     }
 
     // 4. Send & Auto-sync

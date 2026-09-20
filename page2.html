@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuickClip - Paste and Type</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/svg%3E" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+</head>
+<body class="bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 min-h-screen flex flex-col justify-between font-sans antialiased transition-colors duration-300 selection:bg-neutral-200 dark:selection:bg-neutral-800">
+
+  <!-- Header -->
+  <header class="px-6 py-4 border-b border-slate-200 dark:border-neutral-900 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-2.5">
+        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
+        <h1 class="text-base font-medium tracking-tight text-neutral-900 dark:text-neutral-200">
+          QuickClip
+        </h1>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Nav button back to the clipboard page -->
+        <a
+          href="quickclip.html"
+          class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-slate-200 dark:hover:bg-neutral-800 active:scale-95 transition-all duration-200"
+          title="Back to the clipboard page"
+        >
+          <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          <span class="hidden sm:inline">Clipboard</span>
+        </a>
+
+        <!-- Dark / Light Mode Toggle Button -->
+        <button
+          onclick="toggleDarkMode()"
+          class="p-1.5 rounded-full bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center text-sm"
+          title="Toggle Dark Mode"
+        >
+          <span class="hidden dark:block"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="block dark:hidden"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-6xl mx-auto w-full p-6 sm:p-8 flex-1 flex flex-col">
+    <!-- One card, two boxes -->
+    <div class="bg-white dark:bg-neutral-900/40 border border-slate-200 dark:border-neutral-800/60 rounded-2xl shadow-sm flex-1 grid grid-cols-1 md:grid-cols-2 md:divide-x divide-slate-200 dark:divide-neutral-800/60 overflow-hidden">
+
+      <!-- Left: paste and copy -->
+      <section class="p-6 sm:p-8 flex flex-col gap-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <label for="leftBox" class="text-sm font-semibold text-slate-800 dark:text-neutral-200">Paste and copy</label>
+            <p class="text-xs text-slate-500 dark:text-neutral-500 mt-0.5">Paste text here, then copy it back out.</p>
+          </div>
+          <span id="leftCount" class="text-xs text-slate-400 dark:text-neutral-500 font-mono">0 chars</span>
+        </div>
+
+        <textarea
+          id="leftBox"
+          placeholder="Paste here (Ctrl+V or long-press)..."
+          class="w-full flex-1 min-h-[300px] bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 resize-none font-mono text-sm sm:text-base leading-relaxed transition-all duration-200"
+        ></textarea>
+
+        <div class="grid grid-cols-3 gap-3">
+          <button
+            onclick="pasteIntoLeft()"
+            class="bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs sm:text-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+            Paste
+          </button>
+          <button
+            onclick="copyLeft()"
+            class="bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm transition duration-150 text-xs sm:text-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            Copy
+          </button>
+          <button
+            onclick="clearBox('leftBox')"
+            class="bg-white dark:bg-neutral-950 hover:bg-slate-100 dark:hover:bg-neutral-900 active:scale-95 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-800 transition duration-150 text-xs sm:text-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <!-- Right: type only, copies when you press the spacebar -->
+      <section class="p-6 sm:p-8 flex flex-col gap-4 border-t border-slate-200 dark:border-neutral-800/60 md:border-t-0">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <label for="rightBox" class="text-sm font-semibold text-slate-800 dark:text-neutral-200">Type and auto-copy</label>
+            <p class="text-xs text-slate-500 dark:text-neutral-500 mt-0.5">Everything you type is copied each time you press the spacebar. Pasting is off.</p>
+          </div>
+          <span id="rightCount" class="text-xs text-slate-400 dark:text-neutral-500 font-mono">0 chars</span>
+        </div>
+
+        <textarea
+          id="rightBox"
+          placeholder="Type here..."
+          class="w-full flex-1 min-h-[300px] bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 resize-none font-mono text-sm sm:text-base leading-relaxed transition-all duration-200"
+        ></textarea>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            onclick="copyRight()"
+            class="bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm transition duration-150 text-xs sm:text-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            Copy
+          </button>
+          <button
+            onclick="clearBox('rightBox')"
+            class="bg-white dark:bg-neutral-950 hover:bg-slate-100 dark:hover:bg-neutral-900 active:scale-95 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-800 transition duration-150 text-xs sm:text-sm"
+          >
+            <svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Clear
+          </button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-medium px-5 py-2.5 rounded-full shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+    <span>Copied to clipboard!</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center p-6 text-[11px] text-slate-400 dark:text-neutral-600 border-t border-slate-200 dark:border-neutral-900/60">
+    QuickClip • Minimalist Direct P2P Sync
+  </footer>
+
+  <script>
+    // Set to true if you want to be able to paste into the right box too.
+    const ALLOW_PASTE_IN_RIGHT = false;
+
+    const leftBox = document.getElementById('leftBox');
+    const rightBox = document.getElementById('rightBox');
+
+    // Dark mode (same saved setting as the clipboard page)
+    function initTheme() {
+      let saved = null;
+      try { saved = localStorage.getItem('theme'); } catch (e) { /* storage blocked */ }
+      document.documentElement.classList.toggle('dark', saved !== 'light');
+    }
+
+    function toggleDarkMode() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (e) { /* storage blocked */ }
+    }
+
+    initTheme();
+
+    // Toast
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.querySelector('span').innerText = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2000);
+    }
+
+    // Copy text, with a fallback for browsers that block the clipboard API
+    async function copyText(text) {
+      if (!text) return false;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        try {
+          const helper = document.createElement('textarea');
+          helper.value = text;
+          helper.style.position = 'fixed';
+          helper.style.opacity = '0';
+          document.body.appendChild(helper);
+          helper.select();
+          const ok = document.execCommand('copy');
+          helper.remove();
+          return ok;
+        } catch (err2) {
+          return false;
+        }
+      }
+    }
+
+    function updateCounts() {
+      document.getElementById('leftCount').innerText = `${leftBox.value.length} chars`;
+      document.getElementById('rightCount').innerText = `${rightBox.value.length} chars`;
+    }
+
+    // ---- Left box: paste and copy ----
+    async function pasteIntoLeft() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) { showToast("Clipboard is empty."); return; }
+        leftBox.focus();
+        leftBox.setRangeText(text, leftBox.selectionStart, leftBox.selectionEnd, 'end');
+        updateCounts();
+      } catch (err) {
+        showToast("Can't read the clipboard here. Press Ctrl+V, or long-press and choose Paste.");
+      }
+    }
+
+    async function copyLeft() {
+      if (!leftBox.value) { showToast("Nothing to copy."); return; }
+      showToast((await copyText(leftBox.value)) ? "Copied!" : "Couldn't copy. Select the text and copy it.");
+    }
+
+    // ---- Right box: type only, copy on spacebar ----
+    let previousLength = 0;
+
+    rightBox.addEventListener('input', async () => {
+      const value = rightBox.value;
+      const cursor = rightBox.selectionStart;
+      // A space was just typed if the text grew and the character before the cursor is a space.
+      const typedSpace = value.length > previousLength && value[cursor - 1] === ' ';
+      previousLength = value.length;
+      updateCounts();
+
+      if (typedSpace && value.trim()) {
+        showToast((await copyText(value.trimEnd())) ? "Copied!" : "Couldn't copy. Use the Copy button.");
+      }
+    });
+
+    function blockPaste(e) {
+      if (ALLOW_PASTE_IN_RIGHT) return;
+      e.preventDefault();
+      showToast("Pasting is turned off in this box.");
+    }
+
+    rightBox.addEventListener('paste', blockPaste);
+    rightBox.addEventListener('drop', blockPaste);
+    // Also catches "Paste" from the phone's long-press menu
+    rightBox.addEventListener('beforeinput', (e) => {
+      if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop' || e.inputType === 'insertFromPasteAsQuotation') {
+        blockPaste(e);
+      }
+    });
+
+    async function copyRight() {
+      if (!rightBox.value) { showToast("Nothing to copy."); return; }
+      showToast((await copyText(rightBox.value)) ? "Copied!" : "Couldn't copy. Select the text and copy it.");
+    }
+
+    function clearBox(id) {
+      const box = document.getElementById(id);
+      box.value = '';
+      if (box === rightBox) previousLength = 0;
+      updateCounts();
+      box.focus();
+    }
+
+    leftBox.addEventListener('input', updateCounts);
+  </script>
+</body>
+</html>

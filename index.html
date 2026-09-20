@@ -235,13 +235,22 @@
     if (!peerId) {
       // DESKTOP MODE (Host)
       peerId = 'qc-' + Math.random().toString(36).substring(2, 9);
-      window.history.replaceState({}, '', `?peer=${peerId}`);
+      // FIX: do NOT write ?peer=... into the desktop's own address bar.
+      // Before, refreshing the desktop page kept ?peer=..., so the page was
+      // treated as the PHONE (no QR code was ever drawn). The ?peer= link
+      // now exists only inside the QR code.
+      const baseUrl = window.location.href.split(/[?#]/)[0];
+      generateQrCode(`${baseUrl}?peer=${peerId}`);
 
       peer = new Peer(peerId);
 
       peer.on('open', (id) => {
         document.getElementById('roomBadge').innerText = `ID: ${id}`;
-        generateQrCode(window.location.href);
+      });
+
+      peer.on('error', (err) => {
+        console.error('PeerJS error:', err);
+        showToast("Connection error: " + err.type);
       });
 
       // Desktop listens for incoming mobile connection
@@ -256,6 +265,14 @@
       closeQrModal(); // Hide QR code on mobile device screen
 
       peer = new Peer();
+
+      peer.on('error', (err) => {
+        console.error('PeerJS error:', err);
+        document.getElementById('roomBadge').innerText = 'Not connected';
+        showToast(err.type === 'peer-unavailable'
+          ? "Desktop not found. Refresh the desktop page and scan again."
+          : "Connection error: " + err.type);
+      });
 
       peer.on('open', () => {
         const conn = peer.connect(peerId);
@@ -298,14 +315,21 @@
 
     function generateQrCode(url) {
       document.getElementById('roomUrl').innerText = url;
-      new QRCode(document.getElementById("qrcode"), {
-        text: url,
-        width: 140,
-        height: 140,
-        colorDark : "#0a0a0a",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
-      });
+      const qrBox = document.getElementById("qrcode");
+      qrBox.innerHTML = '';
+      try {
+        new QRCode(qrBox, {
+          text: url,
+          width: 140,
+          height: 140,
+          colorDark : "#0a0a0a",
+          colorLight : "#ffffff",
+          correctLevel : QRCode.CorrectLevel.H
+        });
+      } catch (err) {
+        console.error('QR code failed:', err);
+        qrBox.innerHTML = '<p class="text-xs text-red-500 max-w-[140px]">QR library failed to load. Open the link below on your phone instead.</p>';
+      }
     }
 
     // Modal controls

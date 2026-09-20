@@ -6,8 +6,6 @@
   <title>QuickClip - Phone to Desktop Sync</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
 
@@ -26,7 +24,7 @@
 
     <!-- QR Code / Connect Section -->
     <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 text-center flex flex-col items-center gap-3">
-      <p class="text-sm text-slate-400">1. Scan with your phone to connect:</p>
+      <p class="text-sm text-slate-400">1. Scan with your phone to sync:</p>
       <div id="qrcode" class="p-2 bg-white rounded-xl shadow-lg"></div>
       <p class="text-xs text-slate-500 break-all max-w-xs" id="roomUrl"></p>
     </div>
@@ -43,17 +41,17 @@
       <textarea
         id="clipText"
         rows="6"
-        placeholder="Paste text on phone here... it will appear live on desktop!"
+        placeholder="Type or paste text on phone... it will show here live!"
         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition"
       ></textarea>
 
       <!-- Action Buttons -->
       <div class="grid grid-cols-3 gap-2 mt-2">
         <button
-          onclick="fetchLatestText()"
-          class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 shadow-lg transition text-xs sm:text-sm"
+          onclick="sendText()"
+          class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-medium py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 shadow-lg transition text-xs sm:text-sm"
         >
-          🔄 Refresh
+          🚀 Send
         </button>
         <button
           onclick="copyToClipboard()"
@@ -77,15 +75,16 @@
   </div>
 
   <footer class="text-center p-4 text-xs text-slate-600 border-t border-slate-800">
-    Open this link on both devices to transfer text instantly.
+    Open this link on both devices to transfer text instantly across devices.
   </footer>
 
   <script>
+    // 1. Setup Room ID
     const urlParams = new URLSearchParams(window.location.search);
     let roomId = urlParams.get('room');
 
     if (!roomId) {
-      roomId = Math.random().toString(36).substring(2, 8);
+      roomId = 'clip-' + Math.random().toString(36).substring(2, 10);
       window.history.replaceState({}, '', `?room=${roomId}`);
     }
 
@@ -93,6 +92,7 @@
     const fullUrl = window.location.href;
     document.getElementById('roomUrl').innerText = fullUrl;
 
+    // 2. Generate QR Code
     new QRCode(document.getElementById("qrcode"), {
       text: fullUrl,
       width: 128,
@@ -102,47 +102,47 @@
       correctLevel : QRCode.CorrectLevel.H
     });
 
-    const firebaseConfig = {
-      databaseURL: "https://clip-sync-default-rtdb.firebaseio.com/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const roomRef = db.ref('rooms/' + roomId);
-
     const textarea = document.getElementById('clipText');
 
-    // Send changes to cloud database on input
-    textarea.addEventListener('input', (e) => {
-      roomRef.set({ text: e.target.value });
-    });
+    // 3. Connect to Real-Time Relay (ntfy.sh)
+    const eventSource = new EventSource(`https://ntfy.sh/${roomId}/sse`);
 
-    // Listen for real-time cloud updates
-    roomRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data && data.text !== undefined) {
-        textarea.value = data.text;
-      }
-    });
-
-    // Manual Refresh/Fetch Button
-    function fetchLatestText() {
-      roomRef.once('value').then((snapshot) => {
-        const data = snapshot.val();
-        if (data && data.text) {
-          textarea.value = data.text;
-          showToast("Fetched latest text!");
-        } else {
-          showToast("No text found in room.");
+    eventSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.message !== undefined) {
+          textarea.value = data.message;
+          showToast("Received new text!");
         }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    // Send text to room
+    async function sendText() {
+      const text = textarea.value;
+      await fetch(`https://ntfy.sh/${roomId}`, {
+        method: 'POST',
+        body: text
       });
+      showToast("Sent to room!");
     }
 
-    async function copyToClipboard() {
-      const text = textarea.value;
-      if (!text) return;
+    // Auto-send on typing with a short delay
+    let timeout = null;
+    textarea.addEventListener('input', () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        sendText();
+      }, 500);
+    });
 
+    // 4. Copy & Clear
+    async function copyToClipboard() {
+      if (!textarea.value) return;
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(textarea.value);
         showToast("Copied to clipboard!");
       } catch (err) {
         textarea.select();
@@ -153,8 +153,7 @@
 
     function clearText() {
       textarea.value = '';
-      roomRef.set({ text: '' });
-      showToast("Cleared!");
+      sendText();
     }
 
     function showToast(msg) {

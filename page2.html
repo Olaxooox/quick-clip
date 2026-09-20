@@ -59,7 +59,10 @@
             <label for="leftBox" class="text-sm font-semibold text-slate-800 dark:text-neutral-200">Paste and copy</label>
             <p class="text-xs text-slate-500 dark:text-neutral-500 mt-0.5">Paste text here, then copy it back out.</p>
           </div>
-          <span id="leftCount" class="text-xs text-slate-400 dark:text-neutral-500 font-mono">0 chars</span>
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <span id="leftEmailCount" class="text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/50">0 emails</span>
+            <span id="leftCount" class="text-slate-400 dark:text-neutral-500">0 chars</span>
+          </div>
         </div>
 
         <textarea
@@ -197,7 +200,15 @@
     }
 
     function updateCounts() {
-      document.getElementById('leftCount').innerText = `${leftBox.value.length} chars`;
+      const leftText = leftBox.value;
+      
+      // Regular expression to match email patterns
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      const emailsMatched = leftText.match(emailRegex);
+      const emailCount = emailsMatched ? emailsMatched.length : 0;
+
+      document.getElementById('leftEmailCount').innerText = `${emailCount} ${emailCount === 1 ? 'email' : 'emails'}`;
+      document.getElementById('leftCount').innerText = `${leftText.length} chars`;
       document.getElementById('rightCount').innerText = `${rightBox.value.length} chars`;
     }
 

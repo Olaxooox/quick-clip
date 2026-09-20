@@ -3,83 +3,174 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuickClip - Phone to Desktop Sync</title>
+  <title>QuickClip - Minimal Clipboard Sync</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
+<body class="bg-neutral-950 text-neutral-100 min-h-screen flex flex-col justify-between font-sans antialiased selection:bg-neutral-800 selection:text-neutral-200">
 
-  <header class="p-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur">
-    <div class="max-w-xl mx-auto flex justify-between items-center">
-      <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-        ⚡ QuickClip
-      </h1>
-      <span id="roomBadge" class="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full font-mono">
+  <!-- Header -->
+  <header class="px-6 py-5 border-b border-neutral-900 bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-2.5">
+        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
+        <h1 class="text-base font-medium tracking-tight text-neutral-200">
+          QuickClip
+        </h1>
+      </div>
+      
+      <span id="roomBadge" class="text-xs font-mono bg-neutral-900 text-neutral-400 border border-neutral-800 px-3 py-1 rounded-full">
         Room: ...
       </span>
     </div>
   </header>
 
-  <main class="max-w-xl mx-auto w-full p-4 flex-1 flex flex-col gap-6">
+  <!-- Main Content Layout -->
+  <main class="max-w-5xl mx-auto w-full p-6 sm:p-10 flex-1">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-    <!-- QR Code / Connect Section -->
-    <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 text-center flex flex-col items-center gap-3">
-      <p class="text-sm text-slate-400">1. Scan with your phone to sync:</p>
-      <div id="qrcode" class="p-2 bg-white rounded-xl shadow-lg"></div>
-      <p class="text-xs text-slate-500 break-all max-w-xs" id="roomUrl"></p>
+      <!-- Left Sidebar: Connection & Device Info (4 cols) -->
+      <section class="lg:col-span-4 flex flex-col gap-6">
+        
+        <!-- Connection Status Card -->
+        <div class="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-6 shadow-sm flex flex-col gap-5 transition-all hover:border-neutral-700/60">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-neutral-500">Status</span>
+            <span id="statusBadge" class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 transition-all">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Waiting for phone...
+            </span>
+          </div>
+
+          <!-- QR Code Container (Hides smoothly when connected) -->
+          <div id="qrCard" class="flex flex-col items-center gap-4 py-4 bg-neutral-950/60 rounded-xl border border-neutral-800/80 p-5 transition-all duration-300">
+            <p class="text-xs text-neutral-400 text-center">Scan with phone camera to connect:</p>
+            <div id="qrcode" class="p-3 bg-white rounded-xl shadow-md border border-neutral-200 transition-transform hover:scale-105 duration-200"></div>
+            <p class="text-[11px] text-neutral-500 break-all text-center max-w-xs font-mono" id="roomUrl"></p>
+          </div>
+
+          <!-- Connected Device Box (Shown when phone connects) -->
+          <div id="connectedDeviceCard" class="hidden flex-col gap-3 p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl animate-fade-in">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-neutral-400">Paired Device</span>
+              <button onclick="toggleQrCode()" class="text-xs text-neutral-400 hover:text-neutral-200 transition underline underline-offset-2">
+                Toggle QR
+              </button>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                📱
+              </div>
+              <div class="overflow-hidden">
+                <p id="deviceNameText" class="text-xs font-medium text-neutral-200 truncate">Mobile Device</p>
+                <p class="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live Sync Active
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="px-2 text-xs text-neutral-500 flex flex-col gap-1.5 leading-relaxed">
+          <p class="font-medium text-neutral-400">Minimal Setup:</p>
+          <p>Scan on mobile, paste your text, and click Copy on your desktop. No registration or logins required.</p>
+        </div>
+      </section>
+
+      <!-- Right Column: Text Area & Controls (8 cols) -->
+      <section class="lg:col-span-8 flex flex-col gap-4">
+        <div class="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-6 shadow-sm flex flex-col gap-4 flex-1 transition-all hover:border-neutral-700/60">
+          
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <label for="clipText" class="text-xs font-medium uppercase tracking-wider text-neutral-400">
+              Shared Clipboard
+            </label>
+            <div class="flex items-center gap-3 text-xs text-neutral-500 font-mono">
+              <span id="charCount">0 chars</span>
+              <span>•</span>
+              <span id="wordCount">0 words</span>
+            </div>
+          </div>
+
+          <!-- Main Textarea -->
+          <div class="relative flex-1">
+            <textarea
+              id="clipText"
+              rows="10"
+              placeholder="Paste text on phone to see it live here..."
+              class="w-full h-full min-h-[260px] sm:min-h-[300px] bg-neutral-950/80 border border-neutral-800 rounded-xl p-4 text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-500 focus:border-neutral-500 resize-none font-mono text-sm leading-relaxed transition-all duration-200"
+            ></textarea>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="grid grid-cols-3 gap-3 pt-2">
+            <button
+              onclick="sendText()"
+              class="bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-neutral-700 transition duration-150 text-xs sm:text-sm"
+            >
+              🚀 Send
+            </button>
+            <button
+              onclick="copyToClipboard()"
+              class="bg-neutral-100 hover:bg-white active:scale-95 text-neutral-950 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm transition duration-150 text-xs sm:text-sm"
+            >
+              📋 Copy
+            </button>
+            <button
+              onclick="clearText()"
+              class="bg-neutral-950 hover:bg-neutral-900 active:scale-95 text-neutral-400 hover:text-neutral-200 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-neutral-800 transition duration-150 text-xs sm:text-sm"
+            >
+              🗑️ Clear
+            </button>
+          </div>
+
+        </div>
+      </section>
+
     </div>
-
-    <!-- Clipboard Input Area -->
-    <div class="flex flex-col gap-2">
-      <label for="clipText" class="text-sm font-medium text-slate-300 flex justify-between items-center">
-        <span>2. Shared Clipboard Text</span>
-        <span id="status" class="text-xs text-emerald-400 flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected
-        </span>
-      </label>
-
-      <textarea
-        id="clipText"
-        rows="6"
-        placeholder="Type or paste text on phone... it will show here live!"
-        class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition"
-      ></textarea>
-
-      <!-- Action Buttons -->
-      <div class="grid grid-cols-3 gap-2 mt-2">
-        <button
-          onclick="sendText()"
-          class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-medium py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 shadow-lg transition text-xs sm:text-sm"
-        >
-          🚀 Send
-        </button>
-        <button
-          onclick="copyToClipboard()"
-          class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-medium py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 shadow-lg transition text-xs sm:text-sm"
-        >
-          📋 Copy
-        </button>
-        <button
-          onclick="clearText()"
-          class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-medium py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 border border-slate-700 transition text-xs sm:text-sm"
-        >
-          🗑️ Clear
-        </button>
-      </div>
-    </div>
-
   </main>
 
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-full shadow-2xl transition duration-300 opacity-0 pointer-events-none">
-    Copied to clipboard!
+  <!-- Device Joined Pop-up Modal -->
+  <div id="deviceModal" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300 opacity-0 pointer-events-none">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-4 transform transition-all duration-300 scale-95">
+      <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl text-emerald-400">
+        📱
+      </div>
+      <div>
+        <h3 class="text-base font-semibold text-neutral-100">Device Connected</h3>
+        <p id="modalDeviceName" class="text-xs font-medium font-mono text-emerald-400 mt-1">Mobile Browser</p>
+        <p class="text-xs text-neutral-400 mt-2 leading-relaxed">Your mobile device is synced with this desktop session. The QR code is now hidden.</p>
+      </div>
+      <button 
+        onclick="closeModal()" 
+        class="w-full bg-neutral-100 hover:bg-white text-neutral-950 font-medium py-2 rounded-xl transition duration-150 shadow-sm text-xs"
+      >
+        Dismiss
+      </button>
+    </div>
   </div>
 
-  <footer class="text-center p-4 text-xs text-slate-600 border-t border-slate-800">
-    Open this link on both devices to transfer text instantly across devices.
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-neutral-100 text-neutral-950 text-xs font-medium px-4 py-2 rounded-full shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+    <span>Copied to clipboard!</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center p-6 text-[11px] text-neutral-600 border-t border-neutral-900/60">
+    QuickClip • Minimalist Realtime Sync
   </footer>
 
   <script>
-    // 1. Setup Room ID
+    // 1. Room Setup
     const urlParams = new URLSearchParams(window.location.search);
     let roomId = urlParams.get('room');
 
@@ -92,34 +183,99 @@
     const fullUrl = window.location.href;
     document.getElementById('roomUrl').innerText = fullUrl;
 
-    // 2. Generate QR Code
+    function getDeviceInfo() {
+      const ua = navigator.userAgent;
+      if (/android/i.test(ua)) return "Android Phone";
+      if (/iPhone|iPad|iPod/i.test(ua)) return "iPhone / iOS";
+      if (/Macintosh/i.test(ua)) return "Mac Desktop";
+      if (/Windows/i.test(ua)) return "Windows PC";
+      return "Web Device";
+    }
+
+    const currentDevice = getDeviceInfo();
+
+    // 2. Minimalist QR Code
     new QRCode(document.getElementById("qrcode"), {
       text: fullUrl,
-      width: 128,
-      height: 128,
-      colorDark : "#0f172a",
+      width: 120,
+      height: 120,
+      colorDark : "#0a0a0a",
       colorLight : "#ffffff",
       correctLevel : QRCode.CorrectLevel.H
     });
 
     const textarea = document.getElementById('clipText');
 
-    // 3. Connect to Real-Time Relay (ntfy.sh)
+    // 3. Connect to Real-Time Relay
     const eventSource = new EventSource(`https://ntfy.sh/${roomId}/sse`);
+
+    setTimeout(() => {
+      fetch(`https://ntfy.sh/${roomId}`, {
+        method: 'POST',
+        headers: { 'Title': 'DEVICE_JOIN' },
+        body: JSON.stringify({ type: 'JOIN', device: currentDevice })
+      });
+    }, 800);
 
     eventSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
+        
+        if (data.title === 'DEVICE_JOIN') {
+          const payload = JSON.parse(data.message);
+          if (payload.device !== currentDevice) {
+            onDeviceConnected(payload.device);
+          }
+          return;
+        }
+
         if (data.message !== undefined) {
           textarea.value = data.message;
+          updateCounters();
           showToast("Received new text!");
         }
       } catch (err) {
-        console.error(err);
+        if (e.data) {
+          textarea.value = e.data;
+          updateCounters();
+        }
       }
     };
 
-    // Send text to room
+    function onDeviceConnected(deviceName) {
+      const statusBadge = document.getElementById('statusBadge');
+      statusBadge.className = "text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 transition-all";
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Connected`;
+
+      document.getElementById('qrCard').classList.add('hidden');
+      document.getElementById('connectedDeviceCard').classList.remove('hidden');
+      document.getElementById('connectedDeviceCard').classList.add('flex');
+      document.getElementById('deviceNameText').innerText = deviceName;
+
+      document.getElementById('modalDeviceName').innerText = deviceName;
+      showModal();
+    }
+
+    function toggleQrCode() {
+      const qrCard = document.getElementById('qrCard');
+      qrCard.classList.toggle('hidden');
+    }
+
+    function showModal() {
+      const modal = document.getElementById('deviceModal');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.firstElementChild.classList.remove('scale-95');
+      modal.firstElementChild.classList.add('scale-100');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('deviceModal');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      modal.firstElementChild.classList.remove('scale-100');
+      modal.firstElementChild.classList.add('scale-95');
+    }
+
+    // 4. Send & Auto-sync
     async function sendText() {
       const text = textarea.value;
       await fetch(`https://ntfy.sh/${roomId}`, {
@@ -129,16 +285,23 @@
       showToast("Sent to room!");
     }
 
-    // Auto-send on typing with a short delay
     let timeout = null;
     textarea.addEventListener('input', () => {
+      updateCounters();
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         sendText();
-      }, 500);
+      }, 400);
     });
 
-    // 4. Copy & Clear
+    function updateCounters() {
+      const text = textarea.value;
+      document.getElementById('charCount').innerText = `${text.length} chars`;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      document.getElementById('wordCount').innerText = `${words} words`;
+    }
+
+    // Copy & Clear
     async function copyToClipboard() {
       if (!textarea.value) return;
       try {
@@ -153,12 +316,13 @@
 
     function clearText() {
       textarea.value = '';
+      updateCounters();
       sendText();
     }
 
     function showToast(msg) {
       const toast = document.getElementById('toast');
-      toast.innerText = msg;
+      toast.querySelector('span').innerText = msg;
       toast.classList.remove('opacity-0', 'pointer-events-none');
       setTimeout(() => {
         toast.classList.add('opacity-0', 'pointer-events-none');

@@ -268,6 +268,8 @@
 
       peer.on('error', (err) => {
         console.error('PeerJS error:', err);
+        // Ignore errors once the data channel is already working.
+        if (activeConn && activeConn.open) return;
         document.getElementById('roomBadge').innerText = 'Not connected';
         showToast(err.type === 'peer-unavailable'
           ? "Desktop not found. Refresh the desktop page and scan again."
@@ -293,6 +295,9 @@
         // arrives via its own DEVICE_INFO message (handled below).
         conn.send({ type: 'DEVICE_INFO', device: currentDevice });
         closeQrModal();
+        if (urlParams.get('peer')) {
+          document.getElementById('roomBadge').innerText = 'Connected';
+        }
       };
 
       if (conn.open) handleOpen();   // already open
@@ -310,6 +315,9 @@
 
       conn.on('close', () => {
         showToast("Connection closed.");
+        if (urlParams.get('peer')) {
+          document.getElementById('roomBadge').innerText = 'Disconnected';
+        }
       });
     }
 

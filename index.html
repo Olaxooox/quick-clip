@@ -1456,6 +1456,28 @@ module.exports = QRCode;
             </div>
           </div>
 
+          <!-- File Sync -->
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+              <button onclick="document.getElementById('fileInput').click()" class="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2.5 px-4 sm:text-sm"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Send File</button>
+              <input id="fileInput" type="file" class="hidden" />
+              <span class="text-[11px] text-slate-400 dark:text-neutral-500">or drop a file anywhere on the page</span>
+            </div>
+
+            <div id="fileCard" class="hidden flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl animate-fade-in">
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex-1 min-w-0">
+                  <p id="fileName" class="text-sm font-semibold text-slate-800 dark:text-neutral-200 truncate">file.txt</p>
+                  <p id="fileMeta" class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 mt-0.5">0 B</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button onclick="downloadFile()" class="inline-flex items-center gap-1.5 bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium rounded-xl shadow-sm transition duration-150 text-xs py-2 px-3"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Download</button>
+                  <button onclick="clearFile()" class="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 active:scale-95 text-slate-800 dark:text-neutral-200 font-medium rounded-xl border border-slate-200 dark:border-neutral-700 transition duration-150 text-xs py-2 px-3" title="Remove file from this screen"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Action Controls -->
           <div class="grid grid-cols-3 gap-3 pt-2">
             <button
@@ -1733,6 +1755,10 @@ module.exports = QRCode;
         const blob = new Blob([data.data], { type: data.mime || 'image/png' });
         showImage(blob, data.name);
         showToast("Received an image!");
+      } else if (data.type === 'FILE_SYNC') {
+        const blob = new Blob([data.data]);
+        showFile(blob, data.name);
+        showToast("Received a file!");
       }
     }
 
@@ -1894,6 +1920,88 @@ module.exports = QRCode;
         document.getElementById('shareImageBtn').classList.remove('hidden');
       }
     } catch (e) { /* not supported */ }
+
+    // 5. File sharing: send, receive, download
+    const MAX_FILE_BYTES = 50 * 1024 * 1024;  // 50 MB limit
+    let currentFile = null;                   // { blob, name, url }
+
+    function showFile(blob, name) {
+      if (currentFile) URL.revokeObjectURL(currentFile.url);
+      const url = URL.createObjectURL(blob);
+      currentFile = { blob, name, url };
+      document.getElementById('fileName').innerText = name;
+      setText('fileMeta', formatBytes(blob.size));
+      const card = document.getElementById('fileCard');
+      card.classList.remove('hidden');
+      card.classList.add('flex');
+    }
+
+    function clearFile() {
+      if (currentFile) URL.revokeObjectURL(currentFile.url);
+      currentFile = null;
+      const card = document.getElementById('fileCard');
+      card.classList.add('hidden');
+      card.classList.remove('flex');
+    }
+
+    async function sendFile(blob, name) {
+      if (!(activeConn && activeConn.open)) {
+        showToast("Not connected to phone yet.");
+        return;
+      }
+      const buffer = await blob.arrayBuffer();
+      activeConn.send({ type: 'FILE_SYNC', name: name, size: blob.size, data: buffer });
+      showToast("File sent!");
+    }
+
+    async function handleFileInput(file) {
+      if (!file) {
+        showToast("No file selected.");
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        showToast("File is too large. Maximum " + formatBytes(MAX_FILE_BYTES) + ".");
+        return;
+      }
+      try {
+        showFile(file, file.name);
+        await sendFile(file, file.name);
+      } catch (err) {
+        console.error('File error:', err);
+        showToast("Could not read that file.");
+      }
+    }
+
+    function downloadFile() {
+      if (!currentFile) return;
+      const a = document.createElement('a');
+      a.href = currentFile.url;
+      a.download = currentFile.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("Downloading file...");
+    }
+
+    // Pick a file
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      handleFileInput(file);
+    });
+
+    // Drag and drop a file anywhere on the page
+    document.addEventListener('dragover', (e) => {
+      if (e.dataTransfer.types.includes('Files')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    });
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer && e.dataTransfer.files[0];
+      if (file) handleFileInput(file);
+    });
 
     // Copy & Clear
     async function copyToClipboard() {

@@ -1485,8 +1485,9 @@ module.exports = QRCode;
               <span class="text-[11px] text-slate-400 dark:text-neutral-500">or paste / drop an image anywhere on the page</span>
             </div>
 
-            <div id="imageCard" class="hidden flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl animate-fade-in">
-              <img id="imagePreview" alt="Shared image" class="max-h-64 w-full object-contain rounded-lg" />
+            <div id="imageCard" class="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl">
+              <div id="imagePlaceholder" class="min-h-28 flex items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-neutral-700 text-xs text-slate-400 dark:text-neutral-500">No image selected yet</div>
+              <img id="imagePreview" alt="Shared image" class="hidden max-h-64 w-full object-contain rounded-lg" />
               <div class="flex items-center justify-between gap-3 flex-wrap">
                 <span id="imageMeta" class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 truncate"></span>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -1507,11 +1508,11 @@ module.exports = QRCode;
               <span class="text-[11px] text-slate-400 dark:text-neutral-500">or drop a file anywhere on the page</span>
             </div>
 
-            <div id="fileCard" class="hidden flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl animate-fade-in">
+            <div id="fileCard" class="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-neutral-950/80 border border-slate-200 dark:border-neutral-800 rounded-xl">
               <div class="flex items-center justify-between gap-3 flex-wrap">
                 <div class="flex-1 min-w-0">
-                  <p id="fileName" class="text-sm font-semibold text-slate-800 dark:text-neutral-200 truncate">file.txt</p>
-                  <p id="fileMeta" class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 mt-0.5">0 B</p>
+                  <p id="fileName" class="text-sm font-semibold text-slate-800 dark:text-neutral-200 truncate">No file selected</p>
+                  <p id="fileMeta" class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 mt-0.5">Choose a file to display its details</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                   <button onclick="downloadFile()" class="inline-flex items-center gap-1.5 bg-slate-900 dark:bg-neutral-100 hover:bg-slate-800 dark:hover:bg-white active:scale-95 text-white dark:text-neutral-950 font-medium rounded-xl shadow-sm transition duration-150 text-xs py-2 px-3"><svg class="w-4 h-4 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Download</button>
@@ -1983,6 +1984,8 @@ module.exports = QRCode;
       const url = URL.createObjectURL(blob);
       currentImage = { blob, name: ensureExt(name, blob.type), url };
       document.getElementById('imagePreview').src = url;
+      document.getElementById('imagePreview').classList.remove('hidden');
+      document.getElementById('imagePlaceholder').classList.add('hidden');
       setText('imageMeta', `${currentImage.name} • ${formatBytes(blob.size)}`);
       const card = document.getElementById('imageCard');
       card.classList.remove('hidden');
@@ -1993,9 +1996,9 @@ module.exports = QRCode;
       if (currentImage) URL.revokeObjectURL(currentImage.url);
       currentImage = null;
       document.getElementById('imagePreview').removeAttribute('src');
-      const card = document.getElementById('imageCard');
-      card.classList.add('hidden');
-      card.classList.remove('flex');
+      document.getElementById('imagePreview').classList.add('hidden');
+      document.getElementById('imagePlaceholder').classList.remove('hidden');
+      setText('imageMeta', 'No image selected');
     }
 
     async function sendImage(blob) {
@@ -2117,9 +2120,8 @@ module.exports = QRCode;
     function clearFile() {
       if (currentFile) URL.revokeObjectURL(currentFile.url);
       currentFile = null;
-      const card = document.getElementById('fileCard');
-      card.classList.add('hidden');
-      card.classList.remove('flex');
+      document.getElementById('fileName').innerText = 'No file selected';
+      setText('fileMeta', 'Choose a file to display its details');
     }
 
     async function sendFile(blob, name) {

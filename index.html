@@ -1314,6 +1314,33 @@ module.exports = QRCode;
     .animate-fade-in {
       animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+
+    /* Page background image.
+       The picture must sit in the same folder as this page (same place in the GitHub repo).
+       To use a different picture, change the file name inside url() below.
+       Raise or lower the two overlay numbers (0 to 1) to make the picture
+       stronger or softer behind the cards. */
+    :root {
+      --bg-overlay-light: rgba(248, 250, 252, 0.78);
+      --bg-overlay-dark: rgba(10, 10, 10, 0.72);
+    }
+    body { position: relative; }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background: url('892207386_1620598176217948_8478871625008295771_n.png') center / cover no-repeat;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: var(--bg-overlay-light);
+      transition: background 0.3s;
+    }
+    html.dark body::after { background: var(--bg-overlay-dark); }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 min-h-screen flex flex-col justify-between font-sans antialiased transition-colors duration-300 selection:bg-neutral-200 dark:selection:bg-neutral-800">

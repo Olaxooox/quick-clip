@@ -1842,6 +1842,11 @@ module.exports = QRCode;
       conn.on('data', handleIncomingData);
 
       conn.on('close', () => {
+        for (const [id, pending] of pendingFileAcks) {
+          clearTimeout(pending.timer);
+          pending.reject(new Error('Connection closed.'));
+          pendingFileAcks.delete(id);
+        }
         showToast("Connection closed.");
         if (urlParams.get('peer')) {
           setText('roomBadge', 'Disconnected');
@@ -1921,6 +1926,10 @@ module.exports = QRCode;
       document.getElementById('wordCount').innerText = `${words} words`;
     }
 
+    // Incoming file-transfer state (chunked so large files never become one huge message).
+    const incomingFileTransfers = new Map();
+    const pendingFileAcks = new Map();
+
     // Everything the other device sends arrives here
     function handleIncomingData(data) {
       if (!data) return;
@@ -1935,9 +1944,73 @@ module.exports = QRCode;
         showImage(blob, data.name);
         showToast("Received an image!");
       } else if (data.type === 'FILE_SYNC') {
+        // Backward compatibility with the previous, single-message protocol.
         const blob = new Blob([data.data]);
         showFile(blob, data.name);
         showToast("Received a file!");
+      } else if (data.type === 'FILE_START') {
+        if (!data.id || !Number.isSafeInteger(data.size) || data.size < 0 || data.size > MAX_FILE_BYTES) {
+          if (data.id) activeConn.send({ type: 'FILE_ERROR', id: data.id, message: 'File exceeds the 1 GB limit or has invalid metadata.' });
+          return;
+        }
+        incomingFileTransfers.set(data.id, {
+          name: data.name || 'received-file',
+          size: data.size,
+          mime: data.mime || 'application/octet-stream',
+          chunks: [],
+          received: 0,
+          nextIndex: 0
+        });
+        setText('fileMeta', 'Receiving ' + formatBytes(data.size) + ' • 0%');
+        showToast('Receiving file…');
+      } else if (data.type === 'FILE_CHUNK') {
+        const transfer = incomingFileTransfers.get(data.id);
+        if (!transfer || data.index !== transfer.nextIndex || typeof data.payload !== 'string') return;
+        try {
+          const binary = atob(data.payload);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          transfer.chunks.push(bytes);
+          transfer.received += bytes.length;
+          transfer.nextIndex++;
+          setText('fileMeta', 'Receiving ' + formatBytes(transfer.received) + ' / ' + formatBytes(transfer.size) +
+            ' • ' + Math.min(100, Math.round(transfer.received / Math.max(1, transfer.size) * 100)) + '%');
+          if (data.index % FILE_ACK_WINDOW === FILE_ACK_WINDOW - 1 || transfer.received === transfer.size) {
+            activeConn.send({ type: 'FILE_ACK', id: data.id, index: data.index });
+          }
+        } catch (err) {
+          incomingFileTransfers.delete(data.id);
+          activeConn.send({ type: 'FILE_ERROR', id: data.id, message: 'A file chunk could not be decoded.' });
+        }
+      } else if (data.type === 'FILE_END') {
+        const transfer = incomingFileTransfers.get(data.id);
+        if (!transfer) return;
+        if (transfer.received !== transfer.size) {
+          activeConn.send({ type: 'FILE_ERROR', id: data.id, message: 'The received file was incomplete.' });
+          incomingFileTransfers.delete(data.id);
+          return;
+        }
+        const blob = new Blob(transfer.chunks, { type: transfer.mime });
+        showFile(blob, transfer.name);
+        incomingFileTransfers.delete(data.id);
+        setText('fileMeta', formatBytes(blob.size) + ' • Transfer complete');
+        showToast('File received!');
+      } else if (data.type === 'FILE_ACK') {
+        const pending = pendingFileAcks.get(data.id);
+        if (pending && data.index >= pending.index) {
+          clearTimeout(pending.timer);
+          pendingFileAcks.delete(data.id);
+          pending.resolve();
+        }
+      } else if (data.type === 'FILE_ERROR') {
+        const pending = pendingFileAcks.get(data.id);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingFileAcks.delete(data.id);
+          pending.reject(new Error(data.message || 'The other device reported a transfer error.'));
+        }
+        incomingFileTransfers.delete(data.id);
+        showToast(data.message || 'File transfer failed.');
       }
     }
 
@@ -2102,9 +2175,13 @@ module.exports = QRCode;
       }
     } catch (e) { /* not supported */ }
 
-    // 5. File sharing: send, receive, download
-    const MAX_FILE_BYTES = 50 * 1024 * 1024;  // 50 MB limit
-    let currentFile = null;                   // { blob, name, url }
+    // 5. File sharing: chunked transfer, receive, download
+    // 1 GB is an application limit, not a guarantee that every browser/device has
+    // enough free memory to assemble a file of this size.
+    const MAX_FILE_BYTES = 1024 * 1024 * 1024; // 1 GB
+    const FILE_CHUNK_BYTES = 128 * 1024;       // 128 KiB payload per message
+    const FILE_ACK_WINDOW = 4;                 // bounded in-flight data/backpressure
+    let currentFile = null;                    // { blob, name, url }
 
     function showFile(blob, name) {
       if (currentFile) URL.revokeObjectURL(currentFile.url);
@@ -2124,23 +2201,87 @@ module.exports = QRCode;
       setText('fileMeta', 'Choose a file to display its details');
     }
 
+    function waitForFileAck(id, index) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pendingFileAcks.delete(id);
+          reject(new Error('Timed out waiting for the receiving device. Check the connection and try again.'));
+        }, 60000);
+        pendingFileAcks.set(id, { index, resolve, reject, timer });
+      });
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      const step = 0x8000;
+      for (let i = 0; i < bytes.length; i += step) {
+        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + step, bytes.length)));
+      }
+      return btoa(binary);
+    }
+
     async function sendFile(blob, name) {
       if (!(activeConn && activeConn.open)) {
-        showToast("Not connected to phone yet.");
+        showToast('Not connected to the other device.');
         return;
       }
-      const buffer = await blob.arrayBuffer();
-      activeConn.send({ type: 'FILE_SYNC', name: name, size: blob.size, data: buffer });
-      showToast("File sent!");
+      if (blob.size > MAX_FILE_BYTES) {
+        showToast('File is larger than the 1 GB limit.');
+        return;
+      }
+
+      const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+      const totalChunks = Math.ceil(blob.size / FILE_CHUNK_BYTES);
+      let lastAckPromise = null;
+
+      try {
+        activeConn.send({
+          type: 'FILE_START', id, name: name || 'file',
+          size: blob.size, mime: blob.type || 'application/octet-stream'
+        });
+
+        for (let index = 0; index < totalChunks; index++) {
+          if (!activeConn || !activeConn.open) throw new Error('Connection closed during transfer.');
+          const offset = index * FILE_CHUNK_BYTES;
+          const chunk = blob.slice(offset, Math.min(offset + FILE_CHUNK_BYTES, blob.size));
+          const bytes = new Uint8Array(await chunk.arrayBuffer());
+
+          // Register the acknowledgement before sending to avoid a fast-ACK race.
+          const shouldWait = (index % FILE_ACK_WINDOW === FILE_ACK_WINDOW - 1) || index === totalChunks - 1;
+          if (shouldWait) lastAckPromise = waitForFileAck(id, index);
+          activeConn.send({ type: 'FILE_CHUNK', id, index, payload: bytesToBase64(bytes) });
+
+          const sent = Math.min(blob.size, offset + bytes.length);
+          setText('fileMeta', 'Sending ' + formatBytes(sent) + ' / ' + formatBytes(blob.size) +
+            ' • ' + Math.round(sent / Math.max(1, blob.size) * 100) + '%');
+
+          if (shouldWait) await lastAckPromise;
+        }
+
+        activeConn.send({ type: 'FILE_END', id });
+        setText('fileMeta', formatBytes(blob.size) + ' • Transfer complete');
+        showToast('File sent successfully!');
+      } catch (err) {
+        const pending = pendingFileAcks.get(id);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingFileAcks.delete(id);
+        }
+        try {
+          if (activeConn && activeConn.open) activeConn.send({ type: 'FILE_ERROR', id, message: err.message });
+        } catch (_) {}
+        console.error('File transfer error:', err);
+        showToast('File transfer failed: ' + err.message);
+      }
     }
 
     async function handleFileInput(file) {
       if (!file) {
-        showToast("No file selected.");
+        showToast('No file selected.');
         return;
       }
       if (file.size > MAX_FILE_BYTES) {
-        showToast("File is too large. Maximum " + formatBytes(MAX_FILE_BYTES) + ".");
+        showToast('File is too large. Maximum ' + formatBytes(MAX_FILE_BYTES) + ' (1 GB).');
         return;
       }
       try {
@@ -2148,7 +2289,7 @@ module.exports = QRCode;
         await sendFile(file, file.name);
       } catch (err) {
         console.error('File error:', err);
-        showToast("Could not read that file.");
+        showToast('Could not read that file.');
       }
     }
 

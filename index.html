@@ -1315,23 +1315,36 @@ module.exports = QRCode;
       animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    /* Page background image.
-       The picture must sit in the same folder as this page (same place in the GitHub repo).
-       To use a different picture, change the file name inside url() below.
-       Raise or lower the two overlay numbers (0 to 1) to make the picture
-       stronger or softer behind the cards. */
+    /* Page background: a 9x9 grid of pictures where random tiles fade to other pictures.
+       The picture file names are listed in the script (BG_PICTURES).
+       Raise or lower the two overlay numbers (0 to 1) to show the pictures more or less. */
     :root {
       --bg-overlay-light: rgba(248, 250, 252, 0.78);
       --bg-overlay-dark: rgba(10, 10, 10, 0.72);
     }
     body { position: relative; }
-    body::before {
-      content: "";
+    #bgGrid {
       position: fixed;
       inset: 0;
       z-index: -2;
-      background: url('892207386_1620598176217948_8478871625008295771_n.png') center / cover no-repeat;
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      grid-template-rows: repeat(9, 1fr);
+      gap: 2px;
+      overflow: hidden;
+      pointer-events: none;
     }
+    #bgGrid .cell { position: relative; overflow: hidden; }
+    #bgGrid .cell img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 1.6s ease-in-out;
+    }
+    #bgGrid .cell img.on { opacity: 1; }
     body::after {
       content: "";
       position: fixed;
@@ -1344,6 +1357,9 @@ module.exports = QRCode;
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 min-h-screen flex flex-col justify-between font-sans antialiased transition-colors duration-300 selection:bg-neutral-200 dark:selection:bg-neutral-800">
+
+  <!-- Background picture grid (filled by the script) -->
+  <div id="bgGrid" aria-hidden="true"></div>
 
   <!-- Header -->
   <header class="px-6 py-4 border-b border-slate-200 dark:border-neutral-900 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300">
@@ -1568,6 +1584,141 @@ module.exports = QRCode;
   </footer>
 
   <script>
+    // Background: 9x9 grid of pictures with random fade changes.
+    // Add or remove file names here. The files must sit next to this page in the repo.
+    const BG_PICTURES = [
+      '892207386_1620598176217948_8478871625008295771_n.png',
+      '884827410_3463126970515025_3734395440007477537_n.png',
+      '882003220_1471481887859978_2707503486752334331_n.jpg',
+      '870597011_1939565277454033_9190456167118705817_n.jpg',
+      '872486592_1433439675654590_2366221269988358150_n.jpg',
+      '863947248_1076666132067715_5330672705346577528_n.png',
+      '849370515_1738464850567745_8284351278725319676_n.jpg',
+      '858473046_865886753283415_8530093751539887651_n.png',
+      '857743088_3302718889938566_6801849258511603974_n.jpg',
+      '859315157_1139074932403992_6114474123606597985_n.png'
+    ];
+    const BG_GRID_SIZE = 9;        // 9 x 9 tiles
+    const BG_CHANGE_EVERY_MS = 300; // how often a random tile starts changing
+    const BG_THUMB_SIDE = 480;      // pictures are shrunk to this size once, to keep phones fast
+
+    (function initBackgroundGrid() {
+      const grid = document.getElementById('bgGrid');
+      if (!grid) return;
+
+      // Shrink a loaded picture once; every tile then shares the small copy.
+      function makeThumb(img) {
+        return new Promise((resolve) => {
+          try {
+            const scale = Math.min(1, BG_THUMB_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : img.src), 'image/jpeg', 0.82);
+          } catch (err) {
+            resolve(img.src); // blocked (for example file:// pages): use the original picture
+          }
+        });
+      }
+
+      function loadPicture(name) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = async () => resolve(await makeThumb(img));
+          img.onerror = () => { console.warn('Background picture not found:', name); resolve(null); };
+          img.src = name;
+        });
+      }
+
+      Promise.all(BG_PICTURES.map(loadPicture)).then((loaded) => {
+        const pics = loaded.filter(Boolean);
+        const n = pics.length;
+        if (!n) return;
+
+        // Fill the grid with every picture repeated evenly, in shuffled order,
+        // never putting the same picture next to itself.
+        const G = BG_GRID_SIZE;
+        const total = G * G;
+        const order = [];
+        let bag = [];
+        function drawFromBag() {
+          if (!bag.length) {
+            bag = [...Array(n).keys()];
+            for (let i = bag.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [bag[i], bag[j]] = [bag[j], bag[i]];
+            }
+          }
+          return bag.pop();
+        }
+        for (let i = 0; i < total; i++) {
+          const left = i % G > 0 ? order[i - 1] : -1;
+          const top = i >= G ? order[i - G] : -1;
+          let pick;
+          for (let k = 0; k < 40; k++) {
+            pick = drawFromBag();
+            if (n < 3 || (pick !== left && pick !== top)) break;
+            bag.unshift(pick);
+          }
+          order.push(pick);
+        }
+
+        const cells = order.map((picIndex) => {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          const a = document.createElement('img');
+          const b = document.createElement('img');
+          [a, b].forEach((im) => { im.alt = ''; im.decoding = 'async'; cell.appendChild(im); });
+          a.src = pics[picIndex];
+          cell._imgs = [a, b];
+          cell._front = 0;
+          cell._pic = picIndex;
+          cell._busy = false;
+          grid.appendChild(cell);
+          // gentle staggered fade-in at the start
+          setTimeout(() => a.classList.add('on'), Math.random() * 1400);
+          return cell;
+        });
+
+        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (n < 2 || reduceMotion) return;
+
+        function changeOneTile() {
+          if (document.hidden) return;
+          const idx = Math.floor(Math.random() * cells.length);
+          const cell = cells[idx];
+          if (cell._busy) return;
+          // pick a picture that is not on this tile or any touching tile
+          const G = BG_GRID_SIZE;
+          const touching = new Set([cell._pic]);
+          if (idx % G > 0) touching.add(cells[idx - 1]._pic);
+          if (idx % G < G - 1) touching.add(cells[idx + 1]._pic);
+          if (idx >= G) touching.add(cells[idx - G]._pic);
+          if (idx + G < cells.length) touching.add(cells[idx + G]._pic);
+          let options = [...Array(n).keys()].filter((p) => !touching.has(p));
+          if (!options.length) options = [...Array(n).keys()].filter((p) => p !== cell._pic);
+          const next = options[Math.floor(Math.random() * options.length)];
+
+          const front = cell._imgs[cell._front];
+          const back = cell._imgs[1 - cell._front];
+          cell._busy = true;
+          cell._pic = next; // claim it now so touching tiles do not pick the same one
+          back.src = pics[next];
+          const crossfade = () => {
+            back.classList.add('on');
+            front.classList.remove('on');
+            cell._front = 1 - cell._front;
+            cell._pic = next;
+            setTimeout(() => { cell._busy = false; }, 1800);
+          };
+          (back.decode ? back.decode() : Promise.resolve()).then(crossfade, crossfade);
+        }
+
+        setInterval(changeOneTile, BG_CHANGE_EVERY_MS);
+      });
+    })();
+
     // Null-safe text setter: skips elements that are not on the page.
     function setText(id, text) {
       const el = document.getElementById(id);
